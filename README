@@ -1,0 +1,12 @@
+To Upload New Documentation:
+1. Add to Knowledge folder locally
+2. run:
+python3 manage_vector_store.py upload \
+  --vector-store-id vs_68bcc5297c1c8191a1c3fe60cd775b88 \
+  --files Knowledge/your_new_file.txt
+
+(this uploads the document to OpenAI Vector DB)
+
+To Run Program:
+run:
+streamlit run streamlit_app.py

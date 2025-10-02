@@ -1,0 +1,81 @@
+﻿Site Readiness Forms
+
+
+
+
+
+
+Site Readiness Forms: Enhancing Delivery Efficiency and Customer Experience
+Overview
+The Site Readiness Forms feature helps businesses streamline operations and improve customer satisfaction by proactively addressing potential delivery or service issues. By enabling customers to share important details in advance, companies can reduce delays, handle exceptions effectively, and ensure smooth operations.
+Key Features
+* Customizable Forms: Tailored to business needs, allowing detailed capture of site-related requirements.
+
+* Pre-Delivery Reporting: Customers can submit forms before delivery is scheduled, giving businesses time to prepare.
+
+* Exception Management: Capture access restrictions, handling instructions, or delivery constraints upfront.
+
+* Enhanced Communication: Structured, clear communication reduces misunderstandings.
+
+Workflow-Based Forms
+Forms can be configured under the Admin tab using criteria such as:
+   * Order Level: Service type, account, additional/custom fields.
+
+   * Item Level: Item category or SKU.
+
+If exceptions are flagged (e.g., special access codes, stairs, adult presence required), the order may be marked as a Schedule Exception.
+Order & Item Level Forms
+      * Order Level Form: Can be made mandatory based on service type, account, or additional fields.
+
+      * Item Level Form: Linked to categories or SKUs. Businesses can use the Item Master to predefine these automatically.
+
+Form Status & Updates
+         * Forms appear under the Order details page.
+
+         * If criteria are met, the form shows as Incomplete until filled.
+
+         * Once completed, the status updates to Completed.
+
+         * If exception conditions are met, status changes to Schedule Exception.
+
+Form Configuration
+Admin users configure forms via: Admin Tab > Order Setup > Site Readiness Form.
+Settings
+            * Activate/deactivate forms.
+
+            * Specify criteria by service type, account, or custom fields.
+
+Form Builder
+Drag-and-drop components:
+               * Basic: Text area, number, checkbox, dropdown, radio, button.
+
+               * Advanced: Email, phone, date/time, file, signature.
+
+               * Layout: HTML, columns, panels, tabs, tables.
+
+               * Data: Hidden, container, data map, data grid.
+
+Exceptions
+Rules can be created with AND/OR conditions. If responses match set criteria, the order status becomes Schedule Exception.
+Mobile Application Workflow
+                  * If no forms exist, the mobile app shows a blank tab.
+
+                  * Once submitted on the web portal, forms appear on mobile for view only.
+
+                  * Drivers cannot edit forms.
+
+________________
+
+
+FAQs
+Q1. Who can configure Site Readiness Forms?
+ Admin users can create and manage forms under the Admin tab in DispatchTrack.
+Q2. Can these forms be mandatory?
+ Yes. Forms can be made mandatory based on service type, account, or specific items.
+Q3. What happens if a form identifies an exception?
+ The order status is automatically updated to Schedule Exception, alerting dispatchers for review.
+Q4. Are drivers able to edit forms on the mobile app?
+ No. Drivers can only view submitted forms on their app for reference.
+Q5. How do I get this feature enabled?
+ Contact support@dispatchtrack.com or call 1-866-437-3573 Ext. 2 for activation details.
+DispatchTrack Confidential. All rights reserved
