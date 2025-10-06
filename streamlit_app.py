@@ -501,7 +501,7 @@ def main():
     if "messages" not in st.session_state:
         st.session_state.messages = []
         # Add proactive introduction message
-        intro_message = "Hi! I'm MaxBot, and I'm here to help you with any DT Agent issues you're experiencing. May I have your name so I can assist you better?"
+        intro_message = "Hi! I'm MaxBot, and I'm here to help you with any DT issues you're experiencing. May I have your name so I can assist you better?"
         st.session_state.messages.append({
             "role": "assistant",
             "content": intro_message
@@ -641,7 +641,7 @@ def main():
         st.markdown("### Knowledge Base Management")
         
         # Knowledge Base Management Tabs
-        tab1, tab2, tab3 = st.tabs(["📁 View", "📝 Edit", "⚙️ Sync"])
+        tab1, tab2 = st.tabs(["📁 View", "📝 Edit"])
         
         with tab1:
             st.markdown("#### Knowledge Base Files")
@@ -649,34 +649,9 @@ def main():
             
             if local_files:
                 for file_info in local_files:
-                    col1, col2 = st.columns([3, 1])
-                    with col1:
-                        st.text(f"📄 {file_info['name']} ({file_info['size']} chars)")
-                    with col2:
-                        if st.button("🗑️", key=f"delete_{file_info['name']}", help="Delete file"):
-                            if delete_local_file(file_info['name']):
-                                st.success("File deleted!")
-                                st.rerun()
-                            else:
-                                st.error("Failed to delete file")
+                    st.text(f"📄 {file_info['name']} ({file_info['size']} chars)")
             else:
                 st.text("📭 No knowledge base files found")
-            
-            st.markdown("#### Vector Store Status")
-            if DEFAULT_VECTOR_STORE_IDS:
-                try:
-                    kb_files = get_knowledge_base_files(client, DEFAULT_VECTOR_STORE_IDS[0])
-                    if kb_files:
-                        for file_info in kb_files:
-                            status_emoji = "✅" if file_info["status"] == "completed" else "⏳" if file_info["status"] == "in_progress" else "❌"
-                            st.text(f"{status_emoji} {file_info['name']}")
-                    else:
-                        st.text("📭 No files in vector store")
-                except Exception as e:
-                    st.warning(f"⚠️ Vector store not accessible: {str(e)[:50]}...")
-                    st.text("Chat will work without knowledge base")
-            else:
-                st.info("💡 No vector store configured - chat works with general knowledge")
         
         with tab2:
             st.markdown("#### Edit Knowledge Base Files")
@@ -707,50 +682,13 @@ def main():
             else:
                 st.info("No knowledge base files found. Add files to the Knowledge/ folder to edit them.")
         
-        with tab3:
-            st.markdown("#### Sync to AI Knowledge Base")
-            st.info("After editing files, sync them to make changes available to the AI.")
-            
-            if DEFAULT_VECTOR_STORE_IDS and local_files:
-                if st.button("🔄 Sync All Files to Vector Store", help="Upload all local files to the vector store"):
-                    try:
-                        with st.spinner("Syncing files to vector store..."):
-                            success_count = 0
-                            for file_info in local_files:
-                                if upload_file_to_vector_store(client, DEFAULT_VECTOR_STORE_IDS[0], file_info['path']):
-                                    success_count += 1
-                            
-                            if success_count > 0:
-                                st.success(f"Successfully synced {success_count}/{len(local_files)} files!")
-                            else:
-                                st.error("Failed to sync any files")
-                    except Exception as e:
-                        st.error(f"Sync failed: {str(e)}")
-                        st.info("Chat will work without knowledge base")
-            else:
-                if not DEFAULT_VECTOR_STORE_IDS:
-                    st.warning("No vector store configured")
-                if not local_files:
-                    st.warning("No local files to sync")
-            
-            st.markdown("#### Configuration")
-            st.text(f"Model: {DEFAULT_MODEL}")
-            if DEFAULT_VECTOR_STORE_IDS:
-                st.text(f"Vector Store: {DEFAULT_VECTOR_STORE_IDS[0][:20]}...")
-            else:
-                st.info("💡 No vector store configured - chat works with general knowledge")
-                st.markdown("**To add knowledge base:**")
-                st.markdown("1. Create a vector store in OpenAI")
-                st.markdown("2. Update `DEFAULT_VECTOR_STORE_IDS` in the code")
-                st.markdown("3. Sync your knowledge files")
-        
         st.markdown("---")
         
         st.markdown("### Actions")
         if st.button("Clear Chat"):
             st.session_state.messages = []
             # Re-add the introduction message after clearing
-            intro_message = "Hi! I'm MaxBot, and I'm here to help you with any DT Agent issues you're experiencing. May I have your name so I can assist you better?"
+            intro_message = "Hi! I'm MaxBot, and I'm here to help you with any DT issues you're experiencing. May I have your name so I can assist you better?"
             st.session_state.messages.append({
                 "role": "assistant",
                 "content": intro_message
