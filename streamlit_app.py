@@ -12,17 +12,14 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 from typing import Any, Dict, List, Optional
-from dotenv import load_dotenv, find_dotenv
+from dotenv import load_dotenv
 from openai import OpenAI
 import tempfile
 import shutil
 
 # Load environment variables
-dotenv_path = find_dotenv(usecwd=True)
-if dotenv_path:
-    load_dotenv(dotenv_path)
-else:
-    load_dotenv()
+load_dotenv()
+api_key = os.getenv("OPENAI_API_KEY") or st.secrets["OPENAI_API_KEY"]
 
 # Configuration
 DEFAULT_MODEL = "gpt-4o"
@@ -59,9 +56,9 @@ if not DEFAULT_PROMPT:
 def init_openai_client():
     """Initialize OpenAI client with error handling."""
     try:
-        return OpenAI()
+        return OpenAI(api_key=api_key)
     except Exception as e:
-        st.error(f"OpenAI API key not configured. Please set OPENAI_API_KEY in your .env file.")
+        st.error(f"OpenAI API key not configured. Please set OPENAI_API_KEY in your .env file or Streamlit secrets.")
         st.stop()
 
 
@@ -443,15 +440,15 @@ Automated Escalation System | DispatchTrack Customer Support
 def send_escalation_email(conversation_history: str, customer_name: str = "Customer", messages: List[Dict[str, str]] = None) -> bool:
     """Send escalation email to support team."""
     try:
-        # Email configuration from environment variables
-        smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-        smtp_port = int(os.getenv("SMTP_PORT", "587"))
-        email_user = os.getenv("SUPPORT_EMAIL_USER")
-        email_password = os.getenv("SUPPORT_EMAIL_PASSWORD")
-        support_email = os.getenv("SUPPORT_EMAIL_TO", "support@dispatchtrack.com")
+        # Email configuration from environment variables or Streamlit secrets
+        smtp_server = os.getenv("SMTP_SERVER") or st.secrets.get("SMTP_SERVER", "smtp.gmail.com")
+        smtp_port = int(os.getenv("SMTP_PORT") or st.secrets.get("SMTP_PORT", "587"))
+        email_user = os.getenv("SUPPORT_EMAIL_USER") or st.secrets.get("SUPPORT_EMAIL_USER")
+        email_password = os.getenv("SUPPORT_EMAIL_PASSWORD") or st.secrets.get("SUPPORT_EMAIL_PASSWORD")
+        support_email = os.getenv("SUPPORT_EMAIL_TO") or st.secrets.get("SUPPORT_EMAIL_TO", "support@dispatchtrack.com")
         
         if not email_user or not email_password:
-            st.error("Email configuration not found. Please configure SUPPORT_EMAIL_USER and SUPPORT_EMAIL_PASSWORD in your .env file.")
+            st.error("Email configuration not found. Please configure SUPPORT_EMAIL_USER and SUPPORT_EMAIL_PASSWORD in your .env file or Streamlit secrets.")
             return False
         
         # Create message
