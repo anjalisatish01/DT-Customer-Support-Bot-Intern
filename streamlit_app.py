@@ -14,6 +14,8 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 from dotenv import load_dotenv, find_dotenv
 from openai import OpenAI
+import tempfile
+import shutil
 
 # Load environment variables
 dotenv_path = find_dotenv(usecwd=True)
@@ -25,14 +27,22 @@ else:
 # Configuration
 DEFAULT_MODEL = "gpt-4o"
 DEFAULT_SEED_ROLE = "system"
-DEFAULT_VECTOR_STORE_IDS = ["vs_68bcc5297c1c8191a1c3fe60cd775b88"]
+DEFAULT_VECTOR_STORE_IDS = []  # No vector store by default - can be configured later
 
 # Load prompt from file
 _here = os.path.dirname(__file__)
 _prompt_path = os.path.join(_here, "prompt.txt")
+_knowledge_prompt_path = os.path.join(_here, "Knowledge", "prompt.txt")
 
 DEFAULT_PROMPT = ""
-if os.path.exists(_prompt_path):
+# Try to load from Knowledge directory first (editable), then fallback to root
+if os.path.exists(_knowledge_prompt_path):
+    try:
+        with open(_knowledge_prompt_path, "r", encoding="utf-8") as f:
+            DEFAULT_PROMPT = f.read().strip()
+    except Exception:
+        pass
+elif os.path.exists(_prompt_path):
     try:
         with open(_prompt_path, "r", encoding="utf-8") as f:
             DEFAULT_PROMPT = f.read().strip()
@@ -140,18 +150,123 @@ def get_knowledge_base_files(client: OpenAI, vector_store_id: str) -> List[Dict[
         return []
 
 
+def get_local_knowledge_files() -> List[Dict[str, str]]:
+    """Get list of local knowledge base files."""
+    knowledge_dir = os.path.join(os.path.dirname(__file__), "Knowledge")
+    if not os.path.exists(knowledge_dir):
+        return []
+    
+    files = []
+    for filename in os.listdir(knowledge_dir):
+        file_path = os.path.join(knowledge_dir, filename)
+        if os.path.isfile(file_path):
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                files.append({
+                    "name": filename,
+                    "path": file_path,
+                    "size": len(content),
+                    "content": content
+                })
+            except Exception:
+                files.append({
+                    "name": filename,
+                    "path": file_path,
+                    "size": os.path.getsize(file_path),
+                    "content": ""
+                })
+    
+    return files
+
+
+def upload_file_to_vector_store(client: OpenAI, vector_store_id: str, file_path: str) -> bool:
+    """Upload a single file to the vector store."""
+    try:
+        with open(file_path, "rb") as file_stream:
+            if hasattr(client, 'beta') and hasattr(client.beta, 'vector_stores'):
+                file_batch = client.beta.vector_stores.file_batches.upload_and_poll(
+                    vector_store_id=vector_store_id, files=[file_stream]
+                )
+            elif hasattr(client, 'vector_stores'):
+                file_batch = client.vector_stores.file_batches.upload_and_poll(
+                    vector_store_id=vector_store_id, files=[file_stream]
+                )
+            else:
+                return False
+            
+            return file_batch.status == "completed"
+    except Exception as e:
+        st.error(f"Error uploading file: {e}")
+        return False
+
+
+def delete_file_from_vector_store(client: OpenAI, vector_store_id: str, file_id: str) -> bool:
+    """Delete a file from the vector store."""
+    try:
+        if hasattr(client, 'beta') and hasattr(client.beta, 'vector_stores'):
+            client.beta.vector_stores.files.delete(vector_store_id=vector_store_id, file_id=file_id)
+        elif hasattr(client, 'vector_stores'):
+            client.vector_stores.files.delete(vector_store_id=vector_store_id, file_id=file_id)
+        else:
+            return False
+        return True
+    except Exception as e:
+        st.error(f"Error deleting file: {e}")
+        return False
+
+
+def save_local_file(filename: str, content: str) -> bool:
+    """Save content to a local knowledge base file."""
+    try:
+        knowledge_dir = os.path.join(os.path.dirname(__file__), "Knowledge")
+        os.makedirs(knowledge_dir, exist_ok=True)
+        
+        file_path = os.path.join(knowledge_dir, filename)
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+        return True
+    except Exception as e:
+        st.error(f"Error saving file: {e}")
+        return False
+
+
+def delete_local_file(filename: str) -> bool:
+    """Delete a local knowledge base file."""
+    try:
+        knowledge_dir = os.path.join(os.path.dirname(__file__), "Knowledge")
+        file_path = os.path.join(knowledge_dir, filename)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            return True
+        return False
+    except Exception as e:
+        st.error(f"Error deleting file: {e}")
+        return False
+
+
 def create_chat_request(messages: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Create the request payload for OpenAI chat completion."""
-    return {
+    request = {
         "model": DEFAULT_MODEL,
         "input": messages,
         "text": {
             "format": {"type": "text"},
             "verbosity": "medium",
         },
-        "tools": build_tools(DEFAULT_VECTOR_STORE_IDS),
         "store": True,
     }
+    
+    # Only add tools if vector store is configured and accessible
+    try:
+        tools = build_tools(DEFAULT_VECTOR_STORE_IDS)
+        if tools:
+            request["tools"] = tools
+    except Exception:
+        # If vector store is not accessible, continue without tools
+        pass
+    
+    return request
 
 
 def generate_llm_email_analysis(messages: List[Dict[str, str]], customer_name: str = "Customer") -> Dict[str, str]:
@@ -526,23 +641,113 @@ def main():
     
     # Sidebar with info
     with st.sidebar:
-        st.markdown("### Knowledge Base")
+        st.markdown("### Knowledge Base Management")
         
-        # Get and display knowledge base files
-        if DEFAULT_VECTOR_STORE_IDS:
-            kb_files = get_knowledge_base_files(client, DEFAULT_VECTOR_STORE_IDS[0])
-            if kb_files:
-                for file_info in kb_files:
-                    status_emoji = "✅" if file_info["status"] == "completed" else "⏳" if file_info["status"] == "in_progress" else "❌"
-                    st.text(f"{status_emoji} {file_info['name']}")
+        # Knowledge Base Management Tabs
+        tab1, tab2, tab3 = st.tabs(["📁 View", "📝 Edit", "⚙️ Sync"])
+        
+        with tab1:
+            st.markdown("#### Knowledge Base Files")
+            local_files = get_local_knowledge_files()
+            
+            if local_files:
+                for file_info in local_files:
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        st.text(f"📄 {file_info['name']} ({file_info['size']} chars)")
+                    with col2:
+                        if st.button("🗑️", key=f"delete_{file_info['name']}", help="Delete file"):
+                            if delete_local_file(file_info['name']):
+                                st.success("File deleted!")
+                                st.rerun()
+                            else:
+                                st.error("Failed to delete file")
             else:
-                st.text("📭 No files found")
-        else:
-            st.text("No vector store configured")
+                st.text("📭 No knowledge base files found")
+            
+            st.markdown("#### Vector Store Status")
+            if DEFAULT_VECTOR_STORE_IDS:
+                try:
+                    kb_files = get_knowledge_base_files(client, DEFAULT_VECTOR_STORE_IDS[0])
+                    if kb_files:
+                        for file_info in kb_files:
+                            status_emoji = "✅" if file_info["status"] == "completed" else "⏳" if file_info["status"] == "in_progress" else "❌"
+                            st.text(f"{status_emoji} {file_info['name']}")
+                    else:
+                        st.text("📭 No files in vector store")
+                except Exception as e:
+                    st.warning(f"⚠️ Vector store not accessible: {str(e)[:50]}...")
+                    st.text("Chat will work without knowledge base")
+            else:
+                st.info("💡 No vector store configured - chat works with general knowledge")
         
-        st.markdown("### Configuration")
-        st.text(f"Model: {DEFAULT_MODEL}")
-        st.text(f"Vector Store: {DEFAULT_VECTOR_STORE_IDS[0][:20]}...")
+        with tab2:
+            st.markdown("#### Edit Knowledge Base Files")
+            
+            if local_files:
+                selected_file = st.selectbox(
+                    "Select file to edit:",
+                    [f["name"] for f in local_files],
+                    help="Choose a file to edit its content"
+                )
+                
+                if selected_file:
+                    file_content = next(f["content"] for f in local_files if f["name"] == selected_file)
+                    
+                    edited_content = st.text_area(
+                        f"Edit {selected_file}:",
+                        value=file_content,
+                        height=300,
+                        help="Edit the file content here"
+                    )
+                    
+                    if st.button("💾 Save Changes", key="save_edit"):
+                        if save_local_file(selected_file, edited_content):
+                            st.success("File saved successfully!")
+                            st.rerun()
+                        else:
+                            st.error("Failed to save file")
+            else:
+                st.info("No knowledge base files found. Add files to the Knowledge/ folder to edit them.")
+        
+        with tab3:
+            st.markdown("#### Sync to AI Knowledge Base")
+            st.info("After editing files, sync them to make changes available to the AI.")
+            
+            if DEFAULT_VECTOR_STORE_IDS and local_files:
+                if st.button("🔄 Sync All Files to Vector Store", help="Upload all local files to the vector store"):
+                    try:
+                        with st.spinner("Syncing files to vector store..."):
+                            success_count = 0
+                            for file_info in local_files:
+                                if upload_file_to_vector_store(client, DEFAULT_VECTOR_STORE_IDS[0], file_info['path']):
+                                    success_count += 1
+                            
+                            if success_count > 0:
+                                st.success(f"Successfully synced {success_count}/{len(local_files)} files!")
+                            else:
+                                st.error("Failed to sync any files")
+                    except Exception as e:
+                        st.error(f"Sync failed: {str(e)}")
+                        st.info("Chat will work without knowledge base")
+            else:
+                if not DEFAULT_VECTOR_STORE_IDS:
+                    st.warning("No vector store configured")
+                if not local_files:
+                    st.warning("No local files to sync")
+            
+            st.markdown("#### Configuration")
+            st.text(f"Model: {DEFAULT_MODEL}")
+            if DEFAULT_VECTOR_STORE_IDS:
+                st.text(f"Vector Store: {DEFAULT_VECTOR_STORE_IDS[0][:20]}...")
+            else:
+                st.info("💡 No vector store configured - chat works with general knowledge")
+                st.markdown("**To add knowledge base:**")
+                st.markdown("1. Create a vector store in OpenAI")
+                st.markdown("2. Update `DEFAULT_VECTOR_STORE_IDS` in the code")
+                st.markdown("3. Sync your knowledge files")
+        
+        st.markdown("---")
         
         st.markdown("### Actions")
         if st.button("Clear Chat"):
