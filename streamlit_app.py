@@ -31,26 +31,30 @@ _here = os.path.dirname(__file__)
 _prompt_path = os.path.join(_here, "prompt.txt")
 _knowledge_prompt_path = os.path.join(_here, "Knowledge", "prompt.txt")
 
-DEFAULT_PROMPT = ""
-# Try to load from Knowledge directory first (editable), then fallback to root
-if os.path.exists(_knowledge_prompt_path):
-    try:
-        with open(_knowledge_prompt_path, "r", encoding="utf-8") as f:
-            DEFAULT_PROMPT = f.read().strip()
-    except Exception:
-        pass
-elif os.path.exists(_prompt_path):
-    try:
-        with open(_prompt_path, "r", encoding="utf-8") as f:
-            DEFAULT_PROMPT = f.read().strip()
-    except Exception:
-        pass
-
-if not DEFAULT_PROMPT:
-    DEFAULT_PROMPT = (
+def load_prompt():
+    """Load prompt dynamically from file."""
+    # Try to load from Knowledge directory first (editable), then fallback to root
+    if os.path.exists(_knowledge_prompt_path):
+        try:
+            with open(_knowledge_prompt_path, "r", encoding="utf-8") as f:
+                return f.read().strip()
+        except Exception:
+            pass
+    elif os.path.exists(_prompt_path):
+        try:
+            with open(_prompt_path, "r", encoding="utf-8") as f:
+                return f.read().strip()
+        except Exception:
+            pass
+    
+    # Fallback prompt
+    return (
         "You are DispatchTrack Customer Support Bot. Your job is to give clear, "
-        "efficient, and friendly answers for customers of DT based on documentation."
+        "efficient, and friendly answers for customers about the DispatchTrack (DT) product based on documentation."
     )
+
+# Load initial prompt
+DEFAULT_PROMPT = load_prompt()
 
 
 def init_openai_client():
@@ -563,8 +567,16 @@ def main():
             st.write(prompt)
         
         # Prepare messages for OpenAI API
+        # Load all knowledge base files dynamically
+        system_prompt = load_prompt()  # Load main prompt dynamically
+        
+        # Add all knowledge base files to the system prompt
+        local_files = get_local_knowledge_files()
+        for file_info in local_files:
+            if file_info['name'] != 'prompt.txt':  # Don't duplicate the main prompt
+                system_prompt += f"\n\n--- {file_info['name']} ---\n{file_info['content']}"
+        
         # Add customer name context to system prompt if we have it
-        system_prompt = DEFAULT_PROMPT
         if st.session_state.customer_name:
             system_prompt += f"\n\nCustomer's name: {st.session_state.customer_name}. Make sure to use their name naturally throughout the conversation."
         
@@ -640,47 +652,15 @@ def main():
     with st.sidebar:
         st.markdown("### Knowledge Base Management")
         
-        # Knowledge Base Management Tabs
-        tab1, tab2 = st.tabs(["📁 View", "📝 Edit"])
+        # Knowledge Base Management
+        st.markdown("#### Knowledge Base Files")
+        local_files = get_local_knowledge_files()
         
-        with tab1:
-            st.markdown("#### Knowledge Base Files")
-            local_files = get_local_knowledge_files()
-            
-            if local_files:
-                for file_info in local_files:
-                    st.text(f"📄 {file_info['name']} ({file_info['size']} chars)")
-            else:
-                st.text("📭 No knowledge base files found")
-        
-        with tab2:
-            st.markdown("#### Edit Knowledge Base Files")
-            
-            if local_files:
-                selected_file = st.selectbox(
-                    "Select file to edit:",
-                    [f["name"] for f in local_files],
-                    help="Choose a file to edit its content"
-                )
-                
-                if selected_file:
-                    file_content = next(f["content"] for f in local_files if f["name"] == selected_file)
-                    
-                    edited_content = st.text_area(
-                        f"Edit {selected_file}:",
-                        value=file_content,
-                        height=300,
-                        help="Edit the file content here"
-                    )
-                    
-                    if st.button("💾 Save Changes", key="save_edit"):
-                        if save_local_file(selected_file, edited_content):
-                            st.success("File saved successfully!")
-                            st.rerun()
-                        else:
-                            st.error("Failed to save file")
-            else:
-                st.info("No knowledge base files found. Add files to the Knowledge/ folder to edit them.")
+        if local_files:
+            for file_info in local_files:
+                st.text(f"📄 {file_info['name']} ({file_info['size']} chars)")
+        else:
+            st.text("📭 No knowledge base files found")
         
         st.markdown("---")
         
@@ -707,8 +687,8 @@ def main():
         
         st.markdown("### About")
         st.markdown("""
-        This bot helps with DispatchTrack customer support questions.
-        It uses your uploaded documentation to provide accurate answers.
+        This bot helps with DispatchTrack product support questions.
+        It uses your uploaded documentation to provide accurate answers about the DispatchTrack platform.
         """)
 
 
